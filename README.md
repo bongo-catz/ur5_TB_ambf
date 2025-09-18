@@ -47,7 +47,7 @@ roslaunch ur_description ur5_upload.launch
 For RCM test:
 ```
 cd ~/ur5_ambf/scripts/
-python3 ur5_rcm.py
+/usr/bin/python3 ur5_rcm.py
 ```
 Press '2' key in AMBF window to turn off gravity in the simulation. It is needed because velocity control of joints in AMBF is open-loop. In future work, it will be converted to position control so that vRCM is working in presence of gravity.
 

@@ -30,8 +30,8 @@ import os, sys, time, math
 # Extension modules
 # =============================================================================
 from pyOpt import Optimization
-from pyOpt import SLSQP
-
+# from pyOpt import SLSQP
+from scipy.optimize import minimize
 
 class TargetController:
 	def __init__(self, gui_handle, target_handle):
@@ -87,7 +87,7 @@ class ur5_rcm():
 
 
 		# Initializing KDL FK and Jac solvers for the tool tip
-		self.fk_frame = ChainFkSolverPos_recursive( chain );
+		self.fk_frame = ChainFkSolverPos_recursive( chain )
 		self.J_tip = ChainJntToJacSolver( chain )
 
 		self.cmd_vel = Float64MultiArray()
@@ -234,19 +234,41 @@ class ur5_rcm():
 					res+=J[n,j]*qdot[j]
 				return res
 
-			opt_prob = pyOpt.Optimization('IK velocity',ik)
-			opt_prob.addObj('f')
-			opt_prob.addVarGroup('qdot', q_in.rows(), 'c', lower=-1, upper=1, value=0)
-			opt_prob.addConGroup('g',1,'i')
-			#opt_prob.addCon('g','i')
-			#print opt_prob
+			# opt_prob = pyOpt.Optimization('IK velocity',ik)
+			# opt_prob.addObj('f')
+			# opt_prob.addVarGroup('qdot', q_in.rows(), 'c', lower=-1, upper=1, value=0)
+			# opt_prob.addConGroup('g',1,'i')
+			# #opt_prob.addCon('g','i')
+			# #print opt_prob
 
-			slsqp = pyOpt.SLSQP()
+			# slsqp = pyOpt.SLSQP()
+			# [_, sol, _] = slsqp(opt_prob)
+			# self.cmd_vel.data=sol
 
-			[_, sol, _] = slsqp(opt_prob)
-			self.cmd_vel.data=sol
+			# Initial guess
+			qdot0 = np.zeros(q_in.rows())
 
-			
+			# Objective function for scipy
+			def obj(qdot):
+				f, g, fail = ik(qdot)
+				return f
+
+			# Constraint function for scipy (must return >=0)
+			def cons_fun(qdot):
+				f, g, fail = ik(qdot)
+				return g[0]
+
+			constraints = ({'type':'ineq', 'fun': cons_fun})  # g(qdot) >= 0
+
+			# Bounds for qdot (same as pyOpt)
+			bounds = [(-1,1) for _ in range(q_in.rows())]
+
+			# Solve using SLSQP
+			res = minimize(obj, qdot0, method='SLSQP', bounds=bounds, constraints=constraints)
+
+			# Update command velocities
+			self.cmd_vel.data = res.x
+
 			self.target.controller.run()
 			rate.sleep()
 
